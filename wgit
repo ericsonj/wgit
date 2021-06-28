@@ -5,6 +5,14 @@ import sys
 import os
 import json
 from pathlib import Path
+import re
+import ssh_agent_setup
+
+GUI_CLIENTS = [
+    'gitkraken',
+    'gitg',
+    'tig'
+]
 
 HOME = str(Path.home())
 WIG_CONFIG_FOLDER = f"{HOME}/.config/wit/"
@@ -19,12 +27,23 @@ def get_repo_origin_info():
     return None
 
 
+def get_config_file(url_obj: giturlparse.GitUrlParsed):
+    support_config_files = [
+        f"{WIG_CONFIG_FOLDER}{url_obj.platform}_{url_obj.owner}.json",
+        f"{WIG_CONFIG_FOLDER}{url_obj.platform}.json"
+    ]
+    for config in support_config_files:
+        config_path = Path(config)
+        if config_path.exists():
+            return config_path
+    return None
+
+
 def get_git_env_config(url_obj: giturlparse.GitUrlParsed):
-    config_file_name = f"{url_obj.platform}_{url_obj.owner}.json"
-    config_file = Path(WIG_CONFIG_FOLDER + config_file_name)
+    config_file = get_config_file(url_obj)
     env_config = {}
     try:
-        if config_file.exists():
+        if config_file:
             with open(config_file, 'r') as file:
                 json_dict = json.load(file)
                 ssh_command = json_dict['GIT_SSH_COMMAND'] if 'GIT_SSH_COMMAND' in json_dict else None
@@ -42,7 +61,8 @@ def get_git_env_config(url_obj: giturlparse.GitUrlParsed):
                 for key, value in json_dict.items():
                     if str(key).startswith('GIT_'):
                         env_config[key] = value
-
+        else:
+            env_config['GIT_SSH_COMMAND'] = f"ssh -o User=git -o Hostname={url_obj.host} -o UpdateHostKeys=no -i ~/.ssh/id_{url_obj.platform}_{url_obj.owner} -F /dev/null"
     except Exception as e:
         env_config['GIT_SSH_COMMAND'] = f"ssh -o User=git -o Hostname={url_obj.host} -o UpdateHostKeys=no -i ~/.ssh/id_{url_obj.platform}_{url_obj.owner} -F /dev/null"
     return env_config
@@ -64,13 +84,32 @@ try:
 except:
     pass
 
-_env = os.environ.copy()
 
+gui_tool = None
+
+if sys.argv[1] in GUI_CLIENTS:
+    gui_tool = sys.argv[1]
+
+
+if gui_tool:
+    ssh_agent_setup.setup()
+    ssh_command = env_config['GIT_SSH_COMMAND']
+    identity_file = re.search('(?P<identity_file>-i[ |=]?[a-zA-Z/~\._-]+)', ssh_command).group('identity_file')
+    identity_file = identity_file.replace('-i', '').replace('~', HOME).strip()
+    ssh_agent_setup.addKey(identity_file)
+
+_env = os.environ.copy()
 if env_config:
     for key, value in env_config.items():
         print(f"{key}={value}")
         _env[key] = value
 
-cmd = ['git']
-cmd = cmd + (sys.argv[1:])
-out = subprocess.call(cmd, env=_env)
+if gui_tool:
+    print(_env)
+    cmd = [gui_tool]
+    cmd = cmd + (sys.argv[2:])
+    out = subprocess.call(cmd, env=_env)
+else:
+    cmd = ['git']
+    cmd = cmd + (sys.argv[1:])
+    out = subprocess.call(cmd, env=_env)
