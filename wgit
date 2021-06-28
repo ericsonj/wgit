@@ -44,6 +44,7 @@ def get_git_env_config(url_obj: giturlparse.GitUrlParsed):
     env_config = {}
     try:
         if config_file:
+            print(config_file)
             with open(config_file, 'r') as file:
                 json_dict = json.load(file)
                 ssh_command = json_dict['GIT_SSH_COMMAND'] if 'GIT_SSH_COMMAND' in json_dict else None
@@ -56,8 +57,10 @@ def get_git_env_config(url_obj: giturlparse.GitUrlParsed):
                     env_config['GIT_SSH_COMMAND'] = ssh_command
                 if 'author' in json_dict:
                     env_config['GIT_AUTHOR_NAME'] = json_dict['author']
+                    env_config['GIT_COMMITTER_NAME'] = json_dict['author']
                 if 'email' in json_dict:
                     env_config['GIT_AUTHOR_EMAIL'] = json_dict['email']
+                    env_config['GIT_COMMITTER_EMAIL'] = json_dict['email']
                 for key, value in json_dict.items():
                     if str(key).startswith('GIT_'):
                         env_config[key] = value
