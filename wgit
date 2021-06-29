@@ -8,11 +8,15 @@ from pathlib import Path
 import re
 import ssh_agent_setup
 
-GUI_CLIENTS = [
+GIT_GUI_CLIENTS = [
     'gitkraken',
     'gitg',
     'tig'
 ]
+
+WGIT_CMDS = {
+    'info'
+}
 
 HOME = str(Path.home())
 WIG_CONFIG_FOLDER = f"{HOME}/.config/wit/"
@@ -44,7 +48,7 @@ def get_git_env_config(url_obj: giturlparse.GitUrlParsed):
     env_config = {}
     try:
         if config_file:
-            print(config_file)
+            # print(config_file)
             with open(config_file, 'r') as file:
                 json_dict = json.load(file)
                 ssh_command = json_dict['GIT_SSH_COMMAND'] if 'GIT_SSH_COMMAND' in json_dict else None
@@ -68,12 +72,16 @@ def get_git_env_config(url_obj: giturlparse.GitUrlParsed):
             env_config['GIT_SSH_COMMAND'] = f"ssh -o User=git -o Hostname={url_obj.host} -o UpdateHostKeys=no -i ~/.ssh/id_{url_obj.platform}_{url_obj.owner} -F /dev/null"
     except Exception as e:
         env_config['GIT_SSH_COMMAND'] = f"ssh -o User=git -o Hostname={url_obj.host} -o UpdateHostKeys=no -i ~/.ssh/id_{url_obj.platform}_{url_obj.owner} -F /dev/null"
-    return env_config
+    return env_config, config_file
 
 url = None
 url_obj = None
-args = sys.argv[1:]
+args = sys.argv[1:] if len(sys.argv) > 1 else None
+farg = sys.argv[1] if len(sys.argv) > 1 else None
+is_wgit_cmd = True if farg in WGIT_CMDS else False
+gui_tool = farg if farg in GIT_GUI_CLIENTS else None
 env_config = None
+config_file = None
 
 try:
     cloneIdx = args.index("clone")
@@ -83,16 +91,17 @@ except:
 
 try:
     url_obj = giturlparse.parse(url)
-    env_config = get_git_env_config(url_obj)
+    env_config, config_file = get_git_env_config(url_obj)
 except:
     pass
 
 
-gui_tool = None
-
-if sys.argv[1] in GUI_CLIENTS:
-    gui_tool = sys.argv[1]
-
+if is_wgit_cmd:
+    if farg == 'info':
+        print(config_file)
+        for key, value in env_config.items():
+            print(f"{key}={value}")
+    exit(0)
 
 if gui_tool:
     ssh_agent_setup.setup()
@@ -104,11 +113,9 @@ if gui_tool:
 _env = os.environ.copy()
 if env_config:
     for key, value in env_config.items():
-        print(f"{key}={value}")
         _env[key] = value
 
 if gui_tool:
-    print(_env)
     cmd = [gui_tool]
     cmd = cmd + (sys.argv[2:])
     out = subprocess.call(cmd, env=_env)
