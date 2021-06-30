@@ -1,0 +1,16 @@
+[
+    {
+        "name": "gitlab",
+        "host_owners": [
+            "gitlab.*"
+        ],
+        "IdentityFile": "~/.ssh/id_rsa"
+    },
+    {
+        "name": "github",
+        "host_owners": [
+            "github.*"
+        ],
+        "IdentityFile": "~/.ssh/id_rsa"
+    }
+]
