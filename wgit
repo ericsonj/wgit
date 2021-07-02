@@ -10,6 +10,7 @@ import ssh_agent_setup
 
 WGIT_ENV = 'env'
 WGIT_ACCOUNT = 'account'
+WGIT_ACCOUNTS = 'accounts'
 
 GIT_GUI_CLIENTS = [
     'gitkraken',
@@ -20,7 +21,9 @@ GIT_GUI_CLIENTS = [
 WGIT_CMDS = {
     WGIT_ENV,
     WGIT_ACCOUNT,
-    f"{WGIT_ACCOUNT}.name"
+    f"{WGIT_ACCOUNT}.name",
+    WGIT_ACCOUNTS
+    
 }
 
 HOME = str(Path.home())
@@ -30,8 +33,7 @@ WGIT_ACCOUNTS_FILE = f"{HOME}/.config/wgit/accounts.json"
 def get_repo_origin_info():
     try:
         if Path('.git').exists():
-            origin = subprocess.check_output(
-                ['git', 'config', '--get', 'remote.origin.url']).decode('utf-8')
+            origin = subprocess.check_output(['git', 'remote', 'get-url', 'origin']).decode('utf-8')
             return origin
     except:
         pass
@@ -148,6 +150,9 @@ if is_wgit_cmd:
     elif farg == f"{WGIT_ACCOUNT}.name":
         if account and 'name' in account:
             print(account['name'])
+    elif farg == WGIT_ACCOUNTS:
+        with open(WGIT_ACCOUNTS_FILE, 'r') as openfile:
+            print(openfile.read())
     exit(0)
 
 if gui_tool:
