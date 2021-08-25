@@ -29,6 +29,17 @@ WGIT_CMDS = {
 HOME = str(Path.home())
 WGIT_ACCOUNTS_FILE = f"{HOME}/.config/wgit/accounts.json"
 
+def clean_env(env:dict):
+    resp = {}
+    for key, value in env.items():
+        if not str(key).startswith('GIT_'):
+            resp[key] = value
+    return resp
+
+def print_env(env:dict):
+    for key, value in env.items():
+        if 'GIT' in key:
+            print(f"{key}={value}")
 
 def get_repo_origin_info():
     try:
@@ -114,6 +125,12 @@ def print_enviroment_vars(env_config):
     for key, value in env_config.items():
         print(f"export {key}=\"{value}\";")
 
+    if 'GIT_CONFIG' in env_config:
+        if not 'GIT_AUTHOR_NAME' in env_config: print(f"set -e GIT_AUTHOR_NAME;")
+        if not 'GIT_COMMITTER_NAME' in env_config: print(f"set -e GIT_COMMITTER_NAME;")
+        if not 'GIT_AUTHOR_EMAIL' in env_config: print(f"set -e GIT_AUTHOR_EMAIL;")
+        if not 'GIT_COMMITTER_EMAIL' in env_config: print(f"set -e GIT_COMMITTER_EMAIL;")
+        
 url = None
 url_obj = None
 args = sys.argv[1:] if len(sys.argv) > 1 else None
@@ -164,9 +181,12 @@ if gui_tool:
     ssh_agent_setup.addKey(identity_file)
 
 _env = os.environ.copy()
+## clean GIT_* environment variables
+_env = clean_env(_env)
 if env_config:
     for key, value in env_config.items():
         _env[key] = value
+## print_env(_env)
 
 if gui_tool:
     cmd = [gui_tool]
