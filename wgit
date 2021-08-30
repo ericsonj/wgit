@@ -29,6 +29,19 @@ WGIT_CMDS = {
 HOME = str(Path.home())
 WGIT_ACCOUNTS_FILE = f"{HOME}/.config/wgit/accounts.json"
 
+def parse_git_config(file):
+    resp = {}
+    groupname = ""
+    for line in open(file, 'r'):
+        res = re.search("^\[(?P<groupname>[a-zA-Z0-9]+)[ ]?.*\]", line)
+        if res:
+            groupname = res.group('groupname')
+        else:
+            res = re.search("(?P<key>[\w@\.-_]+)[ ]?=[ ]?[\"]?(?P<value>[\w@\.-_ ]+)[\"]?", line)
+            if res:
+                resp[f"{groupname}.{res.group('key')}"] = res.group('value')
+    return resp
+
 def clean_env(env:dict):
     resp = {}
     for key, value in env.items():
@@ -121,16 +134,22 @@ def get_git_env_config(url_obj: giturlparse.GitUrlParsed, account=None):
         print(e)
     return env_config
 
-def print_enviroment_vars(env_config):
+def print_environment_vars(env_config):
+    if 'GIT_CONFIG' in env_config:
+        config = parse_git_config(env_config['GIT_CONFIG'])
+        if not 'GIT_AUTHOR_NAME' in env_config and 'user.name' in config: 
+            env_config['GIT_AUTHOR_NAME'] = config['user.name']
+        if not 'GIT_COMMITTER_NAME' in env_config and 'user.name' in config: 
+            env_config['GIT_COMMITTER_NAME'] = config['user.name']
+        if not 'GIT_AUTHOR_EMAIL' in env_config and 'user.email' in config: 
+            env_config['GIT_AUTHOR_EMAIL'] = config['user.email']
+        if not 'GIT_COMMITTER_EMAIL' in env_config and 'user.email' in config: 
+            env_config['GIT_COMMITTER_EMAIL'] = config['user.email']
+  
     for key, value in env_config.items():
         print(f"export {key}=\"{value}\";")
 
-    if 'GIT_CONFIG' in env_config:
-        if not 'GIT_AUTHOR_NAME' in env_config: print(f"set -e GIT_AUTHOR_NAME;")
-        if not 'GIT_COMMITTER_NAME' in env_config: print(f"set -e GIT_COMMITTER_NAME;")
-        if not 'GIT_AUTHOR_EMAIL' in env_config: print(f"set -e GIT_AUTHOR_EMAIL;")
-        if not 'GIT_COMMITTER_EMAIL' in env_config: print(f"set -e GIT_COMMITTER_EMAIL;")
-        
+      
 url = None
 url_obj = None
 args = sys.argv[1:] if len(sys.argv) > 1 else None
@@ -158,9 +177,9 @@ if is_wgit_cmd:
     if farg == WGIT_ENV:
         if sarg:
             account = get_account_by_name(sarg)
-            print_enviroment_vars(get_git_env_config(None, account))
+            print_environment_vars(get_git_env_config(None, account))
         elif env_config:
-            print_enviroment_vars(env_config)
+            print_environment_vars(env_config)
     elif farg == WGIT_ACCOUNT:
         if account:
             print(json.dumps(account, indent=2))
