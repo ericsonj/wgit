@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+import subprocess
+import argparse
+import sys
+import re
+import os
+
+VERSION = '1.0.0'
+
+class GitEnv:
+
+    def __init__(self, env: dict = os.environ.copy()) -> None:
+        self.env = env
+        self.git_env = {}
+
+    def set_git_env_var(self, key, value):
+        self.git_env[key] = value
+
+    def print_export(self):
+        for key, value in self.git_env.items():
+            print(f"export {key}=\"{value}\";")
+
+
+class GitConfig:
+
+    def __init__(self, file: str) -> None:
+        self.file = file
+        self.configs = self.parse_git_config(self.file)
+
+    def parse_git_config(file):
+        resp = {}
+        groupname = ""
+        for line in open(file, 'r'):
+            res = re.search("^\[(?P<groupname>[a-zA-Z0-9]+)[ ]?.*\]", line)
+            if res:
+                groupname = res.group('groupname')
+            else:
+                res = re.search("(?P<key>[\w@\.-_]+)[ ]?=[ ]?[\"]?(?P<value>[\w@\.-_ ]+)[\"]?", line)
+                if res:
+                    resp[f"{groupname}.{res.group('key')}"] = res.group('value')
+        return resp
+
+    def get_config_by_key(self, key: str):
+        return self.configs[key]
+
+class WGit:
+
+    WRAPPER_KEY = 'wrap'
+    GIT_CMD = 'git'
+
+    def __init__(self, argv) -> None:
+        self.argv = argv
+
+    def process_wrap_cmd(self):
+        parser = argparse.ArgumentParser(description="""Wrapper of GIT command for handle multi-accounts of git multi-platforms. Use this command for control wgit.""",
+                                     prog=f"wgit {self.WRAPPER_KEY}")
+        parser.add_argument("-v", "--verbose",
+                            help="increase output verbosity",
+                            action="store_true")
+        parser.parse_args(sys.argv.remove(self.WRAPPER_KEY))
+        parser.print_help()
+
+    def process_git_cmd(self):
+        cmd = [self.GIT_CMD]
+        cmd = cmd + (self.argv[1:])
+        subprocess.call(cmd)
+
+    def process(self):
+        if self.WRAPPER_KEY in self.argv:
+            self.process_wrap_cmd()
+        else:
+            self.process_git_cmd()
+
+
+if __name__ == "__main__":
+    WGit(sys.argv).process()
