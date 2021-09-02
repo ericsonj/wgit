@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
+from pathlib import Path
 import subprocess
 import argparse
+import giturlparse
+import json
 import sys
 import re
 import os
@@ -20,6 +23,10 @@ class GitEnv:
         for key, value in self.git_env.items():
             print(f"export {key}=\"{value}\";")
 
+    def get_env(self) -> dict:
+        for key, value in self.git_env.items():
+            self.env[key] = value
+        return self.env
 
 class GitConfig:
 
@@ -47,9 +54,87 @@ class WGit:
 
     WRAPPER_KEY = 'wrap'
     GIT_CMD = 'git'
+    CLONE_CMD = 'clone'
+    HOME = str(Path.home())
+    WGIT_ACCOUNTS_FILE = f"{HOME}/.config/wgit/accounts.json"
 
     def __init__(self, argv) -> None:
-        self.argv = argv
+        try:
+            self.argv = argv
+            if self.CLONE_CMD in self.argv:
+                self.git_url = self.argv[self.argv.index(self.CLONE_CMD) + 1]
+            else:
+                self.git_url = self._get_repo_origin_info()
+            self.git_url = giturlparse.parse(self.git_url)
+            self.account = self._get_account_by_host_owner(f"{self.git_url.platform}_{self.git_url.owner}")
+            self.env:GitEnv = GitEnv()
+            self._init_git_env(self.git_url, self.account)
+            print(self.env.get_env())
+        except Exception as e: 
+            raise e
+
+    def _getKeyMatched(self, test, lst: list):
+        if test in lst:
+            return test
+        else:
+            for l in lst:
+                if re.match(l, test):
+                    return l
+        return None
+
+    def _get_repo_origin_info(self):
+        try:
+            origin = subprocess.check_output(['git', 'remote', 'get-url', 'origin']).decode('utf-8')
+            return origin
+        except Exception as e:
+            raise e
+    
+    def _get_account_by_host_owner(self, key_host_owner):
+        accounts_dict = {}
+        with open(self.WGIT_ACCOUNTS_FILE, 'r') as file:
+            accounts = json.load(file)
+            if not isinstance(accounts, list):
+                return None
+            for account in accounts:
+                if 'host_owners' in account and isinstance(account['host_owners'], list):
+                    for host_owner in account['host_owners']:
+                        accounts_dict[host_owner] = account
+        key = self._getKeyMatched(key_host_owner, list(accounts_dict.keys()))
+        return None if not key else accounts_dict[key]
+
+    def _init_git_env(self, url_obj: giturlparse.GitUrlParsed, account=None):
+        try:
+            if account:
+                ssh_command = account['GIT_SSH_COMMAND'] if 'GIT_SSH_COMMAND' in account else None
+                if not ssh_command and not url_obj:
+                    indentity_file = account['IdentityFile'] if 'IdentityFile' in account else " ~/.ssh/id_rsa"
+                    self.env.set_git_env_var('GIT_SSH_COMMAND',  f"ssh -o UpdateHostKeys=no -i {indentity_file} -F /dev/null")
+                elif not ssh_command and url_obj:
+                    user = account['User'] if 'User' in account else url_obj.user
+                    hostname = account['HostName'] if 'HostName' in account else url_obj.host
+                    indentity_file = account['IdentityFile'] if 'IdentityFile' in account else " ~/.ssh/id_rsa"
+                    self.env.set_git_env_var('GIT_SSH_COMMAND', f"ssh -o User={user} -o Hostname={hostname} -o UpdateHostKeys=no -i {indentity_file} -F /dev/null")
+                elif ssh_command:
+                    self.env.set_git_env_var('GIT_SSH_COMMAND', ssh_command)
+
+                if 'author' in account:
+                    self.env.set_git_env_var('GIT_AUTHOR_NAME', account['author'])
+                    self.env.set_git_env_var('GIT_COMMITTER_NAME', account['author'])
+
+                if 'email' in account:
+                    self.env.set_git_env_var('GIT_AUTHOR_EMAIL', account['email'])
+                    self.env.set_git_env_var('GIT_COMMITTER_EMAIL', account['email'])
+
+                if 'name' in account:
+                    self.env.set_git_env_var('WGIT_ACCOUNT_NAME', account['name'])
+
+                for key, value in account.items():
+                    if str(key).startswith('GIT_'):
+                        self.env.set_git_env_var(key, value)
+            elif url_obj:
+                self.env.set_git_env_var('GIT_SSH_COMMAND', f"ssh -o User=git -o Hostname={url_obj.host} -o UpdateHostKeys=no -i ~/.ssh/id_{url_obj.platform}_{url_obj.owner} -F /dev/null")
+        except:
+            raise Exception('Error in loading environment variables')
 
     def process_wrap_cmd(self):
         parser = argparse.ArgumentParser(description="""Wrapper of GIT command for handle multi-accounts of git multi-platforms. Use this command for control wgit.""",
@@ -63,7 +148,7 @@ class WGit:
     def process_git_cmd(self):
         cmd = [self.GIT_CMD]
         cmd = cmd + (self.argv[1:])
-        subprocess.call(cmd)
+        subprocess.call(cmd, env=self.env.get_env())
 
     def process(self):
         if self.WRAPPER_KEY in self.argv:
@@ -73,4 +158,7 @@ class WGit:
 
 
 if __name__ == "__main__":
-    WGit(sys.argv).process()
+    try:
+        WGit(sys.argv).process()
+    except Exception as e:
+        print('wgit:', e)
