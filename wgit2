@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
+from pygments import lexers, formatters, highlight
 import subprocess
 import argparse
 import giturlparse
@@ -9,6 +10,7 @@ import re
 import os
 
 VERSION = '1.0.0'
+
 
 class GitEnv:
 
@@ -28,6 +30,7 @@ class GitEnv:
             self.env[key] = value
         return self.env
 
+
 class GitConfig:
 
     def __init__(self, file: str) -> None:
@@ -42,13 +45,16 @@ class GitConfig:
             if res:
                 groupname = res.group('groupname')
             else:
-                res = re.search("(?P<key>[\w@\.-_]+)[ ]?=[ ]?[\"]?(?P<value>[\w@\.-_ ]+)[\"]?", line)
+                res = re.search(
+                    "(?P<key>[\w@\.-_]+)[ ]?=[ ]?[\"]?(?P<value>[\w@\.-_ ]+)[\"]?", line)
                 if res:
-                    resp[f"{groupname}.{res.group('key')}"] = res.group('value')
+                    resp[f"{groupname}.{res.group('key')}"] = res.group(
+                        'value')
         return resp
 
     def get_config_by_key(self, key: str):
         return self.configs[key]
+
 
 class WGit:
 
@@ -61,17 +67,17 @@ class WGit:
     def __init__(self, argv) -> None:
         try:
             self.argv = argv
+            self.env: GitEnv = GitEnv()
             if self.CLONE_CMD in self.argv:
                 self.git_url = self.argv[self.argv.index(self.CLONE_CMD) + 1]
             else:
                 self.git_url = self._get_repo_origin_info()
             self.git_url = giturlparse.parse(self.git_url)
             self.account = self._get_account_by_host_owner(f"{self.git_url.platform}_{self.git_url.owner}")
-            self.env:GitEnv = GitEnv()
             self._init_git_env(self.git_url, self.account)
-            print(self.env.get_env())
-        except Exception as e: 
-            raise e
+        except Exception as e:
+            if not self.WRAPPER_KEY in self.argv:
+                raise e
 
     def _getKeyMatched(self, test, lst: list):
         if test in lst:
@@ -83,12 +89,14 @@ class WGit:
         return None
 
     def _get_repo_origin_info(self):
+        printOutput =  self.WRAPPER_KEY in self.argv
         try:
-            origin = subprocess.check_output(['git', 'remote', 'get-url', 'origin']).decode('utf-8')
+            origin = subprocess.check_output(
+                ['git', 'remote', 'get-url', 'origin'], shell=printOutput).decode('utf-8')
             return origin
         except Exception as e:
-            raise e
-    
+            raise Exception("unable to get origin url")
+
     def _get_account_by_host_owner(self, key_host_owner):
         accounts_dict = {}
         with open(self.WGIT_ACCOUNTS_FILE, 'r') as file:
@@ -108,42 +116,82 @@ class WGit:
                 ssh_command = account['GIT_SSH_COMMAND'] if 'GIT_SSH_COMMAND' in account else None
                 if not ssh_command and not url_obj:
                     indentity_file = account['IdentityFile'] if 'IdentityFile' in account else " ~/.ssh/id_rsa"
-                    self.env.set_git_env_var('GIT_SSH_COMMAND',  f"ssh -o UpdateHostKeys=no -i {indentity_file} -F /dev/null")
+                    self.env.set_git_env_var(
+                        'GIT_SSH_COMMAND',  f"ssh -o UpdateHostKeys=no -i {indentity_file} -F /dev/null")
                 elif not ssh_command and url_obj:
                     user = account['User'] if 'User' in account else url_obj.user
                     hostname = account['HostName'] if 'HostName' in account else url_obj.host
                     indentity_file = account['IdentityFile'] if 'IdentityFile' in account else " ~/.ssh/id_rsa"
-                    self.env.set_git_env_var('GIT_SSH_COMMAND', f"ssh -o User={user} -o Hostname={hostname} -o UpdateHostKeys=no -i {indentity_file} -F /dev/null")
+                    self.env.set_git_env_var(
+                        'GIT_SSH_COMMAND', f"ssh -o User={user} -o Hostname={hostname} -o UpdateHostKeys=no -i {indentity_file} -F /dev/null")
                 elif ssh_command:
                     self.env.set_git_env_var('GIT_SSH_COMMAND', ssh_command)
 
                 if 'author' in account:
-                    self.env.set_git_env_var('GIT_AUTHOR_NAME', account['author'])
-                    self.env.set_git_env_var('GIT_COMMITTER_NAME', account['author'])
+                    self.env.set_git_env_var(
+                        'GIT_AUTHOR_NAME', account['author'])
+                    self.env.set_git_env_var(
+                        'GIT_COMMITTER_NAME', account['author'])
 
                 if 'email' in account:
-                    self.env.set_git_env_var('GIT_AUTHOR_EMAIL', account['email'])
-                    self.env.set_git_env_var('GIT_COMMITTER_EMAIL', account['email'])
+                    self.env.set_git_env_var(
+                        'GIT_AUTHOR_EMAIL', account['email'])
+                    self.env.set_git_env_var(
+                        'GIT_COMMITTER_EMAIL', account['email'])
 
                 if 'name' in account:
-                    self.env.set_git_env_var('WGIT_ACCOUNT_NAME', account['name'])
+                    self.env.set_git_env_var(
+                        'WGIT_ACCOUNT_NAME', account['name'])
 
                 for key, value in account.items():
                     if str(key).startswith('GIT_'):
                         self.env.set_git_env_var(key, value)
             elif url_obj:
-                self.env.set_git_env_var('GIT_SSH_COMMAND', f"ssh -o User=git -o Hostname={url_obj.host} -o UpdateHostKeys=no -i ~/.ssh/id_{url_obj.platform}_{url_obj.owner} -F /dev/null")
+                self.env.set_git_env_var(
+                    'GIT_SSH_COMMAND', f"ssh -o User=git -o Hostname={url_obj.host} -o UpdateHostKeys=no -i ~/.ssh/id_{url_obj.platform}_{url_obj.owner} -F /dev/null")
         except:
             raise Exception('Error in loading environment variables')
 
     def process_wrap_cmd(self):
         parser = argparse.ArgumentParser(description="""Wrapper of GIT command for handle multi-accounts of git multi-platforms. Use this command for control wgit.""",
-                                     prog=f"wgit {self.WRAPPER_KEY}")
-        parser.add_argument("-v", "--verbose",
-                            help="increase output verbosity",
-                            action="store_true")
-        parser.parse_args(sys.argv.remove(self.WRAPPER_KEY))
-        parser.print_help()
+                                         prog=f"wgit {self.WRAPPER_KEY}")
+        # parser.add_argument("-v", "--verbose",
+        #                     help="increase output verbosity",
+        #                     action="store_true")
+        parser.add_argument(
+            "-v", "--version",
+            help="wgit version",
+            action="store_true"
+        )
+        parser.add_argument(
+            "-l",
+            "--list",
+            help=f"show accounts from {self.WGIT_ACCOUNTS_FILE}",
+            action="store_true"
+        )
+        parser.add_argument(
+            "-e", 
+            "--env",
+            help=f"print environment of current repository",
+            action="store_true"
+        )
+
+        args = parser.parse_args(sys.argv.remove(self.WRAPPER_KEY))
+
+        if args.version:
+            print(f"v{VERSION}")
+        elif args.list:
+            with open(self.WGIT_ACCOUNTS_FILE, 'r') as file:
+                accounts = json.load(file)
+                colorful_json = highlight(
+                    json.dumps(accounts, indent=2, sort_keys=True),
+                    lexers.JsonLexer(),
+                    formatters.Terminal256Formatter())
+                print(colorful_json)
+        elif args.env:
+            self.env.print_export()
+        else:
+            parser.print_help()
 
     def process_git_cmd(self):
         cmd = [self.GIT_CMD]
