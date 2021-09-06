@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name="wgit",
-    version="0.0.1",
+    version="0.0.2",
     author="Ericson Joseph",
     author_email="ericsonjoseph@gmail.com",
     description="Wrapper of git for multiple accounts and servers",
@@ -12,7 +12,8 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=[
         'giturlparse',
-        'ssh_agent_setup'
+        'ssh_agent_setup',
+        'pygments'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
