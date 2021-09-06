@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
+import ssh_agent_setup
 from pygments import lexers, formatters, highlight
 import subprocess
 import argparse
@@ -10,7 +11,7 @@ import re
 import os
 
 VERSION = '1.0.0'
-
+HOME = str(Path.home())
 
 class GitEnv:
 
@@ -58,26 +59,17 @@ class GitConfig:
 
 class WGit:
 
-    WRAPPER_KEY = 'wrap'
+    WRAPPER_KEY = '!'
     GIT_CMD = 'git'
     CLONE_CMD = 'clone'
     HOME = str(Path.home())
     WGIT_ACCOUNTS_FILE = f"{HOME}/.config/wgit/accounts.json"
 
     def __init__(self, argv) -> None:
-        try:
-            self.argv = argv
-            self.env: GitEnv = GitEnv()
-            if self.CLONE_CMD in self.argv:
-                self.git_url = self.argv[self.argv.index(self.CLONE_CMD) + 1]
-            else:
-                self.git_url = self._get_repo_origin_info()
-            self.git_url = giturlparse.parse(self.git_url)
-            self.account = self._get_account_by_host_owner(f"{self.git_url.platform}_{self.git_url.owner}")
-            self._init_git_env(self.git_url, self.account)
-        except Exception as e:
-            if not self.WRAPPER_KEY in self.argv:
-                raise e
+        self.argv = argv
+        self.env: GitEnv = GitEnv()
+        self.git_url = None
+        self.account = None
 
     def _getKeyMatched(self, test, lst: list):
         if test in lst:
@@ -92,7 +84,7 @@ class WGit:
         printOutput =  self.WRAPPER_KEY in self.argv
         try:
             origin = subprocess.check_output(
-                ['git', 'remote', 'get-url', 'origin'], shell=printOutput).decode('utf-8')
+                ['git', 'remote', 'get-url', 'origin']).decode('utf-8')
             return origin
         except Exception as e:
             raise Exception("unable to get origin url")
@@ -175,6 +167,14 @@ class WGit:
             help=f"print environment of current repository",
             action="store_true"
         )
+        parser.add_argument(
+            "-g",
+            "--gui",
+            nargs='?',
+            help=f"open git GUI client (default: gitg)",
+            const="gitg",
+            type=str
+        )
 
         args = parser.parse_args(sys.argv.remove(self.WRAPPER_KEY))
 
@@ -190,6 +190,15 @@ class WGit:
                 print(colorful_json)
         elif args.env:
             self.env.print_export()
+        elif args.gui:
+            ssh_agent_setup.setup()
+            if 'GIT_SSH_COMMAND' in self.env.git_env:
+                ssh_command = self.env.git_env['GIT_SSH_COMMAND']
+                identity_file = re.search('(?P<identity_file>-i[ |=]?[a-zA-Z/~\._-]+)', ssh_command).group('identity_file')
+                identity_file = identity_file.replace('-i', '').replace('~', HOME).strip()
+                ssh_agent_setup.addKey(identity_file)
+                self.env.env = os.environ.copy()
+            subprocess.call(args.gui.split(), env=self.env.get_env())
         else:
             parser.print_help()
 
@@ -199,6 +208,17 @@ class WGit:
         subprocess.call(cmd, env=self.env.get_env())
 
     def process(self):
+        try:
+            if self.CLONE_CMD in self.argv:
+                self.git_url = self.argv[self.argv.index(self.CLONE_CMD) + 1]
+            else:
+                self.git_url = self._get_repo_origin_info()
+            self.git_url = giturlparse.parse(self.git_url)
+            self.account = self._get_account_by_host_owner(f"{self.git_url.platform}_{self.git_url.owner}")
+            self._init_git_env(self.git_url, self.account)     
+        except Exception as e:
+            raise e
+
         if self.WRAPPER_KEY in self.argv:
             self.process_wrap_cmd()
         else:
