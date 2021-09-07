@@ -98,14 +98,21 @@ class WGit:
 
     def _get_account_by_host_owner(self, key_host_owner):
         accounts_dict = {}
-        with open(self.WGIT_ACCOUNTS_FILE, 'r') as file:
-            accounts = json.load(file)
-            if not isinstance(accounts, list):
-                return None
-            for account in accounts:
-                if 'host_owners' in account and isinstance(account['host_owners'], list):
-                    for host_owner in account['host_owners']:
-                        accounts_dict[host_owner] = account
+        try:
+            with open(self.WGIT_ACCOUNTS_FILE, 'r') as file:
+                accounts = json.load(file)
+                if not isinstance(accounts, list):
+                    return None
+                for account in accounts:
+                    if 'host_owners' in account and isinstance(account['host_owners'], list):
+                        for host_owner in account['host_owners']:
+                            accounts_dict[host_owner] = account
+        except FileNotFoundError:
+            print(f"wgit: 🚨 Accounts file not found, create the file {self.WGIT_ACCOUNTS_FILE}")
+            print(f"wgit:    You can use the template https://github.com/ericsonj/wgit/blob/main/accounts.temp.json")
+        except Exception as e:
+            raise e
+
         key = self._getKeyMatched(key_host_owner, list(accounts_dict.keys()))
         return None if not key else accounts_dict[key]
 
