@@ -91,9 +91,9 @@ class WGit:
         printOutput =  self.WRAPPER_KEY in self.argv
         try:
             origin = subprocess.check_output(
-                ['git', 'remote', 'get-url', 'origin']).decode('utf-8')
+                ['git', 'remote', 'get-url', 'origin'], stderr=(subprocess.STDOUT if printOutput else None)).decode('utf-8')
             return origin
-        except Exception as e:
+        except Exception:
             raise Exception("unable to get origin url")
 
     def _get_account_by_host_owner(self, key_host_owner):
@@ -191,9 +191,9 @@ class WGit:
         )
 
         parser.add_argument(
-            "git_commad",
+            "command",
             nargs='?',
-            help="continue git command, ex: wgit ! status"
+            help="continue git command, ex: wgit ! \"status\""
         )
 
         args = parser.parse_args(sys.argv.remove(self.WRAPPER_KEY))
@@ -219,11 +219,11 @@ class WGit:
                 ssh_agent_setup.addKey(identity_file)
                 self.env.env = os.environ.copy()
             subprocess.call(args.gui.split(), env=self.env.get_env())
-        else:
+        elif not args.command:
            print("Hi!, try: wgit ! -h")
 
-        if args.git_commad:
-            subprocess.call(['git'] + args.git_commad.split(), env=self.env.get_env())
+        if args.command:
+            subprocess.call(['git'] + args.command.split(), env=self.env.get_env())
 
     def process_git_cmd(self):
         cmd = [self.GIT_CMD]
@@ -240,7 +240,8 @@ class WGit:
             self.account = self._get_account_by_host_owner(f"{self.git_url.platform}_{self.git_url.owner}")
             self._init_git_env(self.git_url, self.account)     
         except Exception as e:
-            raise e
+            if not self.WRAPPER_KEY in self.argv:
+                raise e
 
         if self.WRAPPER_KEY in self.argv:
             self.process_wrap_cmd()
