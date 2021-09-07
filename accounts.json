@@ -1,6 +1,8 @@
 [
     {
         "name": "gitlab",
+        "author": "author",
+        "email": "email",
         "host_owners": [
             "gitlab.*"
         ],
@@ -8,6 +10,8 @@
     },
     {
         "name": "github",
+        "author": "author",
+        "email": "email",
         "host_owners": [
             "github.*"
         ],

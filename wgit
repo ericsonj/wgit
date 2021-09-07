@@ -109,7 +109,7 @@ class WGit:
                             accounts_dict[host_owner] = account
         except FileNotFoundError:
             print(f"wgit: 🚨 Accounts file not found, create the file {self.WGIT_ACCOUNTS_FILE}")
-            print(f"wgit:    You can use the template https://github.com/ericsonj/wgit/blob/main/accounts.temp.json")
+            print(f"wgit:    You can use the template https://github.com/ericsonj/wgit/blob/main/accounts.json")
         except Exception as e:
             raise e
 
