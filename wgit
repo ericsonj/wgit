@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from logging import setLogRecordFactory
 from pathlib import Path
 import ssh_agent_setup
 from pygments import lexers, formatters, highlight
@@ -181,6 +182,16 @@ class WGit:
         except:
             raise Exception('Error in loading environment variables')
 
+    def _open_gui(self, command: str):
+        ssh_agent_setup.setup()
+        if 'GIT_SSH_COMMAND' in self.env.git_env:
+            ssh_command = self.env.git_env['GIT_SSH_COMMAND']
+            identity_file = re.search('(?P<identity_file>-i[ |=]?[a-zA-Z/~\._-]+)', ssh_command).group('identity_file')
+            identity_file = identity_file.replace('-i', '').replace('~', HOME).strip()
+            ssh_agent_setup.addKey(identity_file)
+            self.env.env = os.environ.copy()
+        subprocess.call(command.split(), env=self.env.get_env())
+
     def process_wrap_cmd(self):
 
         parser = argparse.ArgumentParser(description="""Wrapper of GIT command for handle multi-accounts of git multi-platforms. Use this command for control wgit.""",
@@ -208,7 +219,7 @@ class WGit:
             "-g",
             "--gui",
             nargs='?',
-            help=f"open git GUI client (default: gitg) or try: wgit ! -g \"gitkraken -p .\"",
+            help=f"run git client command (default: gitg) or try: wgit ! -g \"gitkraken -p .\"",
             const="gitg",
             type=str
         )
@@ -216,7 +227,7 @@ class WGit:
         parser.add_argument(
             "command",
             nargs='?',
-            help="continue git command, ex: wgit ! \"status\""
+            help="continue git command or open git GUI client [gitg | gitkraken], ex: wgit ! \"status\"",
         )
 
         args = parser.parse_args(sys.argv.remove(self.WRAPPER_KEY))
@@ -234,19 +245,17 @@ class WGit:
         elif args.env:
             self.env.print_export()
         elif args.gui:
-            ssh_agent_setup.setup()
-            if 'GIT_SSH_COMMAND' in self.env.git_env:
-                ssh_command = self.env.git_env['GIT_SSH_COMMAND']
-                identity_file = re.search('(?P<identity_file>-i[ |=]?[a-zA-Z/~\._-]+)', ssh_command).group('identity_file')
-                identity_file = identity_file.replace('-i', '').replace('~', HOME).strip()
-                ssh_agent_setup.addKey(identity_file)
-                self.env.env = os.environ.copy()
-            subprocess.call(args.gui.split(), env=self.env.get_env())
+            self._open_gui(args.gui)
         elif not args.command:
            print("Hi!, try: wgit ! -h")
 
         if args.command:
-            subprocess.call(['git'] + args.command.split(), env=self.env.get_env())
+            if args.command == 'gitg':
+                self._open_gui("gitg .")
+            elif args.command == 'gitkraken':
+                self._open_gui("gitkraken -p .")
+            else:
+                subprocess.call(['git'] + args.command.split(), env=self.env.get_env())
 
     def process_git_cmd(self):
         cmd = [self.GIT_CMD]
