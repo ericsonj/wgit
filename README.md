@@ -92,3 +92,37 @@ You have to configure in this file yours git accounts and SSH keys, example:
 * **GIT_EDITOR** [*string*]: is the editor Git will launch when the user needs to edit some text.
 * **GIT_\*** [*string*]: set environment git variable, see https://git-scm.com/book/en/v2/Git-Internals-Environment-Variables.
 
+## Example account.json
+
+```json
+[
+    {
+        "name": "myjob_gitlab",
+        "host_owners": [
+            "gitlab_myjob",
+            "gitlab_myjobgroup"
+        ],
+        "IdentityFile": "~/.ssh/id_myjob_gitlab",
+        "GIT_CONFIG": "/home/ericson/.config/wgit/gitlab_myjob_config"
+    },
+    {
+        "name": "gitlab",
+        "host_owners": [
+            "gitlab.*"
+        ],
+        "IdentityFile": "~/.ssh/id_rsa",
+        "author": "Ericson Joseph",
+        "email": "ericsonjoseph@gmail.com"
+    },
+    {
+        "name": "github",
+        "host_owners": [
+            "github.*"
+        ],
+        "IdentityFile": "~/.ssh/id_rsa",
+        "author": "Ericson Joseph",
+        "email": "ericsonjoseph@gmail.com",
+        "GIT_EDITOR": "vim"
+    }
+]
+```

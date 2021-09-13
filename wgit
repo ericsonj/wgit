@@ -173,10 +173,14 @@ class WGit:
             if 'GIT_CONFIG' in account:
                 try:
                     config = self._parse_git_config(account['GIT_CONFIG'])
-                    self.env.set_git_env_var('GIT_AUTHOR_NAME', config['user.name'])
-                    self.env.set_git_env_var('GIT_COMMITTER_NAME', config['user.name'])
-                    self.env.set_git_env_var('GIT_AUTHOR_EMAIL', config['user.email'])
-                    self.env.set_git_env_var('GIT_COMMITTER_EMAIL', config['user.email'])
+                    if config['user.name']:
+                        self.env.set_git_env_var('GIT_AUTHOR_NAME', config['user.name'])
+                        self.env.set_git_env_var('GIT_COMMITTER_NAME', config['user.name'])
+                    if config['user.email']:
+                        self.env.set_git_env_var('GIT_AUTHOR_EMAIL', config['user.email'])
+                        self.env.set_git_env_var('GIT_COMMITTER_EMAIL', config['user.email'])
+                    if config['core.editor']:
+                        self.env.set_git_env_var('GIT_EDITOR', config['core.editor'])
                 except Exception as e:
                     print(e)
         except:
