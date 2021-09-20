@@ -1,8 +1,20 @@
 # Wrapper GIT
 
-Full wrapper of git command for handle multiple accounts and servers.
+Full wrapper of git command for handle multiple accounts and git servers.
+
+![wgit](/img/wgit.jpg)
+
+# Why use wgit?
+
+* wgit is full wrapper and transparent git command.
+* Whit wgit you don't have to change the domain of repository in config file.
+* Whit wgit you can set individuals git config file by accounts.
+* Whit wgit you can have different configurations by accounts.
+* wgit support submodules synchronization.
 
 # Install
+
+> 💡 **git is required**
 
 * Install from git+https:
 
@@ -97,13 +109,13 @@ You have to configure in this file yours git accounts and SSH keys, example:
 ```json
 [
     {
-        "name": "myjob_gitlab",
+        "name": "work_gitlab",
         "host_owners": [
-            "gitlab_myjob",
-            "gitlab_myjobgroup"
+            "gitlab_work",
+            "gitlab_workgroup"
         ],
-        "IdentityFile": "~/.ssh/id_myjob_gitlab",
-        "GIT_CONFIG": "/home/ericson/.config/wgit/gitlab_myjob_config"
+        "IdentityFile": "~/.ssh/id_work_gitlab",
+        "GIT_CONFIG": "/home/ericson/.config/wgit/gitlab_work_config"
     },
     {
         "name": "gitlab",
